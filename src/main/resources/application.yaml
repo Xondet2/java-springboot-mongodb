@@ -4,6 +4,7 @@ spring:
   data:
     mongodb:
       uri: ${MONGODB_URI}
+      database: ${MONGODB_DB:vehiculo}
       auto-index-creation: false
 server:
   port: ${PORT:8080}
