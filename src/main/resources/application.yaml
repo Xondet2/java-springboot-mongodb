@@ -1,3 +1,9 @@
 spring:
   application:
     name: Vehiculo
+  data:
+    mongodb:
+      uri: ${MONGODB_URI}
+      auto-index-creation: false
+server:
+  port: ${PORT:8080}
