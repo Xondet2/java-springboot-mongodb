@@ -69,10 +69,6 @@ curl http://localhost:8080/api/vehiculos/ABC123
 curl "http://localhost:8080/api/vehiculos/buscar?q=Toy"
 ```
 
-## Nota importante sobre entorno local, App ID y API Key
-- Esta API no expone credenciales públicas. Para operar de forma segura se espera un backend ejecutándose en un entorno local/controlado.
-- Si deseas integrar servicios que requieren **App ID** y **API Key** (p. ej., App Services/Data API en Atlas), la creación y uso de esas credenciales puede estar **limitada por políticas de organización** o por el **plan free**.
-- En el flujo actual, los datos se originan desde tu entorno local y se **persisten en la base de datos de Atlas**. Pueden ser consultados desde la misma API, pero el uso sigue **requiriendo el entorno local** para manejar credenciales y configuración de manera segura.
 
 ## Despliegue (Docker/Render)
 - Este repositorio incluye un `Dockerfile` multi-stage:
@@ -92,4 +88,64 @@ curl "http://localhost:8080/api/vehiculos/buscar?q=Toy"
 - `JAVA_HOME` no definido: usa runtime Java o Docker en Render.
 - `./mvnw: Permission denied` en Linux: marca ejecutable (`chmod +x mvnw`) o ejecuta con `bash ./mvnw`.
 - Conexión Atlas rechazada: revisa IP allowlist y credenciales de usuario.
-- Alaracion: en render un error comun es que no se referencia bien la base de datos o tiene una respuesta incorrecta, se llama a la base de datos y se actualiza desde consola a mongodb atlas y se puede llamar informacion desde la base a local, temas de configuracion api key y app id especificadas mas arriba, url de despliegue en render https://java-springboot-mongodb.onrender.com
+
+## Probar en navegador
+- Base URL (Render): `https://java-springboot-mongodb.onrender.com`
+- Endpoints directos:
+  - Listar todo: `https://java-springboot-mongodb.onrender.com/api/vehiculos/buscar`
+  - Búsqueda por texto: `https://java-springboot-mongodb.onrender.com/api/vehiculos/buscar?q=Mazda`
+  - Detalle por placa: `https://java-springboot-mongodb.onrender.com/api/vehiculos/TEST-A001`
+
+### Crear desde consola del navegador
+1. Abre la base URL y presiona `F12` → `Console`.
+2. Pega y ejecuta el siguiente script para insertar un conjunto de vehículos de prueba:
+
+Este script ya se ejecuto desde el link de manera que los datos se guardan en la base de datos MondoDb atlas
+
+```js
+const BASE_URL = 'https://java-springboot-mongodb.onrender.com';
+
+const dataset = [
+  { placa: 'TEST-A001', marca: 'Mazda', modelo: '3', color: 'Azul', anio: 2019 },
+  { placa: 'TEST-A002', marca: 'Mazda', modelo: 'CX-5', color: 'Rojo', anio: 2021 },
+  { placa: 'TEST-A003', marca: 'Mazda', modelo: '2', color: 'Gris', anio: 2018 },
+  { placa: 'TEST-B001', marca: 'Toyota', modelo: 'Corolla', color: 'Rojo', anio: 2020 },
+  { placa: 'TEST-B002', marca: 'Toyota', modelo: 'Yaris', color: 'Negro', anio: 2017 },
+  { placa: 'TEST-B003', marca: 'Toyota', modelo: 'RAV4', color: 'Blanco', anio: 2022 },
+  { placa: 'TEST-C001', marca: 'Hyundai', modelo: 'Accent', color: 'Blanco', anio: 2016 },
+  { placa: 'TEST-C002', marca: 'Hyundai', modelo: 'Tucson', color: 'Azul', anio: 2023 },
+  { placa: 'TEST-C003', marca: 'Hyundai', modelo: 'Elantra', color: 'Gris', anio: 2019 }
+];
+
+const postVehiculo = (v) =>
+  fetch(`${BASE_URL}/api/vehiculos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(v)
+  }).then(async r => ({ status: r.status, body: await r.json().catch(() => null), input: v }))
+    .catch(e => ({ status: 'error', error: String(e), input: v }));
+
+const wait = (ms) => new Promise(res => setTimeout(res, ms));
+
+async function batchInsert(items, concurrency = 5, delayMs = 150) {
+  const results = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    const chunk = items.slice(i, i + concurrency);
+    const res = await Promise.all(chunk.map(postVehiculo));
+    results.push(...res);
+    await wait(delayMs);
+  }
+  const ok = results.filter(r => r.status === 201).length;
+  const dup = results.filter(r => r.status === 409).length;
+  const err = results.filter(r => r.status !== 201 && r.status !== 409).length;
+  console.table(results.map(r => ({ status: r.status, placa: r.input.placa, marca: r.input.marca, modelo: r.input.modelo })));
+  console.log(`Insertados: ${ok} | Duplicados: ${dup} | Otros: ${err}`);
+  return results;
+}
+
+batchInsert(dataset, 6, 200);
+```
+
+### Validaciones rápidas
+- Búsqueda: `https://java-springboot-mongodb.onrender.com/api/vehiculos/buscar?q=Mazda`
+- Detalle por placa: `https://java-springboot-mongodb.onrender.com/api/vehiculos/TEST-A001`
